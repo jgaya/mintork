@@ -25,7 +25,7 @@ const translations: Record<Locale, Translations> = {
       titleHighlight: "Mintork Soft",
       description:
         "Empower your organization with cutting-edge software solutions. From analytics to security, we deliver enterprise-grade tools that scale with your ambitions.",
-      contactSales: "Contact Us",
+      contactSales: "Contact Sales",
       viewProducts: "View Products",
       statClients: "Clients",
       statUptime: "Uptime",
@@ -43,7 +43,7 @@ const translations: Record<Locale, Translations> = {
         "Real-time data analytics and business intelligence platform with customizable dashboards and predictive insights.",
       cloudTitle: "Copa Center Padel",
       cloudDesc:
-        "Unified cloud infrastructure management for multi-cloud environments with automated scaling and monitoring.",
+         "Copa Center Padel organizer showing cloud management interface",
       securityTitle: "SecureVault",
       securityDesc:
         "Enterprise-grade cybersecurity suite with AI-powered threat detection, compliance management, and zero-trust architecture.",
@@ -83,7 +83,7 @@ const translations: Record<Locale, Translations> = {
       previous: "Previous",
       next: "Next",
       analyticsAlt: "Mintork Analytics dashboard showing real-time data visualization",
-      cloudAlt: "Copa Center Padel organizer showing cloud management interface",
+      cloudAlt: "CloudSync Pro cloud infrastructure management interface",
       securityAlt: "SecureVault cybersecurity threat detection dashboard",
       automationAlt: "FlowEngine workflow automation visual builder",
       collaborationAlt: "TeamHub project management and collaboration interface",
@@ -110,6 +110,7 @@ const translations: Record<Locale, Translations> = {
       message: "Message",
       messagePlaceholder: "Tell us about your project and requirements...",
       sendInquiry: "Send Inquiry",
+      sending: "Sending...",
       thankYou: "Thank You!",
       thankYouMsg:
         "Your inquiry has been received. A member of our team will reach out to you within 24 hours to discuss your needs.",
@@ -157,8 +158,7 @@ const translations: Record<Locale, Translations> = {
       badge: "Soluciones de Software",
       titleStart: "Construye el Futuro con",
       titleHighlight: "Mintork Soft",
-      description:
-        "Potencia tu negocio con soluciones de software de vanguardia. Desde analitycs hasta seguridad, ofrecemos herramientas de nivel empresarial que escalan con tus ambiciones.",
+      description: "Potencia tu negocio con soluciones de software de vanguardia. Desde analitycs hasta seguridad, ofrecemos herramientas de nivel empresarial que escalan con tus ambiciones.",
       contactSales: "Contactenos",
       viewProducts: "Ver Productos",
       statClients: "Clientes",
@@ -176,8 +176,7 @@ const translations: Record<Locale, Translations> = {
       analyticsDesc:
         "Plataforma de analitica de datos en tiempo real e inteligencia empresarial con paneles personalizables e informacion predictiva.",
       cloudTitle: "Copa Center Padel",
-      cloudDesc:
-        "Gestion unificada de infraestructura en la nube para entornos multi-nube con escalado automatico y monitoreo.",
+      cloudDesc: "Organizador de la Copa Center Padel mostrando gestion en la nube",
       securityTitle: "SecureVault",
       securityDesc:
         "Suite de ciberseguridad de nivel empresarial con deteccion de amenazas impulsada por IA, gestion de cumplimiento y arquitectura de confianza cero.",
@@ -207,7 +206,7 @@ const translations: Record<Locale, Translations> = {
         "Cada compromiso es una alianza. Tenemos exito cuando tu negocio prospera.",
       resultsTitle: "Resultados Comprobados",
       resultsDesc:
-        "Nuestros clientes ven en promedio un 40% de mejora en la eficiencia operativa durante el primer año.",
+        "Nuestros clientes ven en promedio un 40% de mejora en la eficiencia operativa durante el primer ano.",
     },
     gallery: {
       label: "Galeria de Productos",
@@ -244,6 +243,7 @@ const translations: Record<Locale, Translations> = {
       message: "Mensaje",
       messagePlaceholder: "Cuentenos sobre su proyecto y requisitos...",
       sendInquiry: "Enviar Consulta",
+      sending: "Enviando...",
       thankYou: "Gracias!",
       thankYouMsg:
         "Su consulta ha sido recibida. Un miembro de nuestro equipo se comunicara con usted dentro de las 24 horas para discutir sus necesidades.",

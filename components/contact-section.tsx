@@ -17,11 +17,50 @@ import { useI18n } from "@/lib/i18n"
 
 export function ContactSection() {
   const [submitted, setSubmitted] = useState(false)
+  const [isLoading, setIsLoading] = useState(false)
+  const [error, setError] = useState<string | null>(null)
   const { t } = useI18n()
 
-  function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
+  async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault()
-    setSubmitted(true)
+    setIsLoading(true)
+    setError(null)
+
+    const formData = new FormData(e.currentTarget)
+    const firstName = formData.get("firstName") as string
+    const lastName = formData.get("lastName") as string
+    const email = formData.get("email") as string
+    const company = formData.get("company") as string
+    const product = formData.get("interest") as string
+    const message = formData.get("message") as string
+
+    try {
+      const response = await fetch("/api/contact", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          name: `${firstName} ${lastName}`.trim(),
+          email,
+          company,
+          product,
+          message,
+        }),
+      })
+
+      const data = await response.json()
+
+      if (!response.ok) {
+        throw new Error(data.error || "Failed to send message")
+      }
+
+      setSubmitted(true)
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Something went wrong")
+    } finally {
+      setIsLoading(false)
+    }
   }
 
   return (
@@ -67,6 +106,7 @@ export function ContactSection() {
                     <Label htmlFor="firstName">{t("contact", "firstName")}</Label>
                     <Input
                       id="firstName"
+                      name="firstName"
                       placeholder="John"
                       required
                       className="bg-secondary/50"
@@ -76,6 +116,7 @@ export function ContactSection() {
                     <Label htmlFor="lastName">{t("contact", "lastName")}</Label>
                     <Input
                       id="lastName"
+                      name="lastName"
                       placeholder="Doe"
                       required
                       className="bg-secondary/50"
@@ -88,6 +129,7 @@ export function ContactSection() {
                     <Label htmlFor="email">{t("contact", "workEmail")}</Label>
                     <Input
                       id="email"
+                      name="email"
                       type="email"
                       placeholder="john@company.com"
                       required
@@ -98,6 +140,7 @@ export function ContactSection() {
                     <Label htmlFor="company">{t("contact", "company")}</Label>
                     <Input
                       id="company"
+                      name="company"
                       placeholder="Acme Inc."
                       className="bg-secondary/50"
                     />
@@ -106,7 +149,7 @@ export function ContactSection() {
 
                 {/* <div className="space-y-2">
                   <Label htmlFor="interest">{t("contact", "productInterest")}</Label>
-                  <Select>
+                  <Select name="interest">
                     <SelectTrigger id="interest" className="bg-secondary/50">
                       <SelectValue placeholder={t("contact", "selectProduct")} />
                     </SelectTrigger>
@@ -126,6 +169,7 @@ export function ContactSection() {
                   <Label htmlFor="message">{t("contact", "message")}</Label>
                   <Textarea
                     id="message"
+                    name="message"
                     placeholder={t("contact", "messagePlaceholder")}
                     rows={5}
                     required
@@ -133,8 +177,19 @@ export function ContactSection() {
                   />
                 </div>
 
-                <Button type="submit" size="lg" className="w-full text-base sm:w-auto">
-                  {t("contact", "sendInquiry")}
+                {error && (
+                  <div className="rounded-lg border border-destructive/50 bg-destructive/10 p-4 text-sm text-destructive">
+                    {error}
+                  </div>
+                )}
+
+                <Button 
+                  type="submit" 
+                  size="lg" 
+                  className="w-full text-base sm:w-auto"
+                  disabled={isLoading}
+                >
+                  {isLoading ? t("contact", "sending") : t("contact", "sendInquiry")}
                 </Button>
               </form>
             )}
@@ -157,7 +212,7 @@ export function ContactSection() {
                   <div>
                     <p className="text-sm font-medium text-foreground">{t("contact", "email")}</p>
                     <p className="mt-0.5 text-sm text-muted-foreground">
-                      contact@mintorksoft.com
+                      contact@mintorksoft.com.ar
                     </p>
                   </div>
                 </div>
@@ -181,7 +236,7 @@ export function ContactSection() {
                   <div>
                     <p className="text-sm font-medium text-foreground">{t("contact", "office")}</p>
                     <p className="mt-0.5 text-sm text-muted-foreground">
-                      Tandil, BA 7000
+                      Tandil, Buenos Aires, Argentina
                     </p>
                   </div>
                 </div>
@@ -194,7 +249,7 @@ export function ContactSection() {
               </h3>
               <p className="mt-2 text-sm leading-relaxed text-muted-foreground">
                 {t("contact", "enterpriseSupportDesc")}{" "}
-                <span className="text-primary">support@mintorksoft.com</span>
+                <span className="text-primary">support@mintorksoft.com.ar</span>
               </p>
             </div>
           </div>

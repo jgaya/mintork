@@ -1,6 +1,7 @@
 "use client"
 
 import { useState } from "react"
+import Image from "next/image"
 import Link from "next/link"
 import { Menu, X } from "lucide-react"
 import { Button } from "@/components/ui/button"
@@ -22,12 +23,14 @@ export function Navbar() {
     <header className="fixed top-0 left-0 right-0 z-50 border-b border-border/50 bg-background/80 backdrop-blur-xl">
       <nav className="mx-auto flex max-w-7xl items-center justify-between px-6 py-4">
         <Link href="/" className="flex items-center gap-2">
-          <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-primary">
-            <span className="text-lg font-bold text-primary-foreground">M</span>
-          </div>
-          <span className="text-xl font-bold tracking-tight text-foreground">
-            Mintork <span className="text-primary">Soft</span>
-          </span>
+          <Image
+            src="/logo.jpg"
+            alt="Mintork Soft"
+            width={532}
+            height={178}
+            className="h-9 w-auto"
+            priority
+          />
         </Link>
 
         <div className="hidden items-center gap-8 md:flex">

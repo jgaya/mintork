@@ -1,6 +1,8 @@
 "use client"
 
 import Link from "next/link"
+import Image from "next/image"
+
 import { useI18n } from "@/lib/i18n"
 
 export function Footer() {
@@ -41,12 +43,14 @@ export function Footer() {
         <div className="grid md:grid-cols-1 lg:grid-cols-1">
           <div className="lg:col-span-1">
             <Link href="/" className="flex items-center gap-2">
-              <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-primary">
-                <span className="text-lg font-bold text-primary-foreground">M</span>
-              </div>
-              <span className="text-xl font-bold tracking-tight text-foreground">
-                Mintork <span className="text-primary">Soft</span>
-              </span>
+              <Image
+                src="/logo.jpg"
+                alt="Mintork Soft"
+                width={532}
+                height={178}
+                className="h-9 w-auto"
+                priority
+              />
             </Link>
 
           </div>
