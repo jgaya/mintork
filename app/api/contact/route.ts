@@ -36,9 +36,8 @@ export async function POST(request: Request) {
 
     // Send email using Resend
     const { data, error } = await resend.emails.send({
-      from: 'Mintork Soft Contact Form <onboarding@resend.dev>',
+      from: `Mintork Soft Contact Form <${contactEmail}>`,
       to: ["juanmail@gmail.com", "gabrielguarna@gmail.com"],
-      cc: contactEmail,
       replyTo: email,
       subject: `New Contact Inquiry from ${name}${company ? ` (${company})` : ''}`,
       html: `
