@@ -43,7 +43,7 @@ const translations: Record<Locale, Translations> = {
         "Real-time data analytics and business intelligence platform with customizable dashboards and predictive insights.",
       cloudTitle: "Copa Center Padel",
       cloudDesc:
-         "Copa Center Padel organizer showing cloud management interface",
+        "Copa Center Padel organizer showing cloud management interface",
       securityTitle: "SecureVault",
       securityDesc:
         "Enterprise-grade cybersecurity suite with AI-powered threat detection, compliance management, and zero-trust architecture.",
@@ -56,6 +56,9 @@ const translations: Record<Locale, Translations> = {
       devtoolsTitle: "DevForge",
       devtoolsDesc:
         "Complete developer toolkit with API management, CI/CD pipelines, and integrated monitoring for modern engineering teams.",
+      encuentroTitle: "Encuentro Padel Azul",
+      encuentroDesc:
+        "Encuentro Padel Azul organizer showing severals tourneys interface",
     },
     about: {
       label: "About Mintork Soft",
@@ -189,6 +192,8 @@ const translations: Record<Locale, Translations> = {
       devtoolsTitle: "DevForge",
       devtoolsDesc:
         "Kit completo de herramientas para desarrolladores con gestion de API, pipelines CI/CD y monitoreo integrado para equipos de ingenieria modernos.",
+      encuentroTitle: "Encuentro Padel Azul",
+      encuentroDesc: "Organizador de torneos de Encuentro Padel Azul mostrando torneos creados en la nube",
     },
     about: {
       label: "Acerca de Mintork Soft",

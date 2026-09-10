@@ -12,12 +12,14 @@ interface ProductDef {
 }
 
 const productDefs: ProductDef[] = [
-  { icon: BarChart3, titleKey: "analyticsTitle", descKey: "analyticsDesc" },
+  { icon: Cloud, titleKey: "encuentroTitle", descKey: "encuentroDesc" },
   { icon: Cloud, titleKey: "cloudTitle", descKey: "cloudDesc" },
   { icon: Shield, titleKey: "securityTitle", descKey: "securityDesc" },
   { icon: Workflow, titleKey: "automationTitle", descKey: "automationDesc" },
   { icon: Users, titleKey: "collaborationTitle", descKey: "collaborationDesc" },
   { icon: Code2, titleKey: "devtoolsTitle", descKey: "devtoolsDesc" },
+  { icon: BarChart3, titleKey: "analyticsTitle", descKey: "analyticsDesc" },
+
 ]
 
 export function ProductsSection() {

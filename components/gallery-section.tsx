@@ -13,17 +13,24 @@ interface GalleryItemDef {
 }
 
 const galleryDefs: GalleryItemDef[] = [
+
   {
-    src: "/images/product-analytics.jpg",
-    altKey: "analyticsAlt",
-    titleKey: "analyticsTitle",
-    categoryKey: "catAnalytics",
+    src: "/images/encuentro_padel.jpg",
+    altKey: "Encuentro Padel",
+    titleKey: "encuentroTitle",
+    categoryKey: "catInfrastructure",
   },
   {
     src: "/images/product-copa.png",
     altKey: "cloudAlt",
     titleKey: "cloudTitle",
     categoryKey: "catInfrastructure",
+  },
+  {
+    src: "/images/product-analytics.jpg",
+    altKey: "analyticsAlt",
+    titleKey: "analyticsTitle",
+    categoryKey: "catAnalytics",
   },
   {
     src: "/images/product-security.jpg",
@@ -43,12 +50,12 @@ const galleryDefs: GalleryItemDef[] = [
     titleKey: "collaborationTitle",
     categoryKey: "catCollaboration",
   },
-  {
-    src: "/images/product-devtools.jpg",
-    altKey: "devtoolsAlt",
-    titleKey: "devtoolsTitle",
-    categoryKey: "catDevTools",
-  },
+  // {
+  //   src: "/images/product-devtools.jpg",
+  //   altKey: "devtoolsAlt",
+  //   titleKey: "devtoolsTitle",
+  //   categoryKey: "catDevTools",
+  // },
 ]
 
 export function GallerySection() {
