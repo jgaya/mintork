@@ -1,7 +1,18 @@
-import { PrismaClient, Role, ProjectStatus, TransactionType, PaymentMethod, TransactionStatus } from '@prisma/client'
+import 'dotenv/config'
+import { PrismaMariaDb } from '@prisma/adapter-mariadb'
+import {
+  PrismaClient,
+  Role,
+  ProjectStatus,
+  TransactionType,
+  PaymentMethod,
+  TransactionStatus,
+} from '../generated/prisma/client'
 import bcrypt from 'bcryptjs'
 
-const prisma = new PrismaClient()
+const prisma = new PrismaClient({
+  adapter: new PrismaMariaDb(process.env.DATABASE_URL!),
+})
 
 async function main() {
   console.log('Seeding Mintork Finance database (ARS)...')

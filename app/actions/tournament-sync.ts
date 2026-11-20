@@ -2,7 +2,7 @@
 
 import { revalidatePath } from 'next/cache'
 import { z } from 'zod'
-import { Prisma } from '@prisma/client'
+import { Prisma } from '@/generated/prisma/client'
 import { prisma } from '@/lib/prisma'
 import { requireApiAuth } from '@/lib/auth'
 import { formatARS } from '@/lib/format'
