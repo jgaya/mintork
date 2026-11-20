@@ -232,6 +232,11 @@ async function ensureBillingConfig() {
 }
 
 async function ensureIncomeCategoryId(): Promise<number> {
+  const torneoCat = await prisma.category.findFirst({
+    where: { name: 'Cobro de Torneo', type: 'INCOME' },
+  })
+  if (torneoCat) return torneoCat.id
+
   const existing = await prisma.category.findFirst({
     where: { name: 'Cobro de Proyecto', type: 'INCOME' },
   })
@@ -244,9 +249,9 @@ async function ensureIncomeCategoryId(): Promise<number> {
 
   const created = await prisma.category.create({
     data: {
-      name: 'Cobro de Proyecto',
+      name: 'Cobro de Torneo',
       type: 'INCOME',
-      color: '#10b981',
+      color: '#6366f1',
       isActive: true,
     },
   })

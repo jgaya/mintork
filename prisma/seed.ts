@@ -8,55 +8,27 @@ import {
   PaymentMethod,
   TransactionStatus,
 } from '../generated/prisma/client'
-import bcrypt from 'bcryptjs'
 
 const prisma = new PrismaClient({
   adapter: new PrismaMariaDb(process.env.DATABASE_URL!),
 })
 
 async function main() {
-  console.log('Seeding Mintork Finance database (ARS)...')
+  console.log('Seeding Mintork Finance database (histórico completo en ARS)...')
 
-  // 1. Admin User
-  const passwordHash = await bcrypt.hash('admin123', 10)
+  // 1. Usuarios
   const admin = await prisma.user.upsert({
     where: { email: 'admin@mintork.com' },
     update: {},
     create: {
       name: 'Administrador Mintork',
       email: 'admin@mintork.com',
-      passwordHash,
+      passwordHash: '$2b$10$nitfJy1pXDo.HNgr7a7RneyNfiSsvZJJVRjedTW6wx6m1QE.iOuty',
       role: Role.ADMIN,
     },
   })
 
-  // 2. Categories
-  const categoriesData = [
-    // Ingresos (INCOME)
-    { name: 'Cobro de Proyecto', type: TransactionType.INCOME, color: '#10b981' },
-    { name: 'Abono / Mantenimiento Mensual', type: TransactionType.INCOME, color: '#14b8a6' },
-    { name: 'Consultoría y Desarrollo', type: TransactionType.INCOME, color: '#06b6d4' },
-    { name: 'Otros Ingresos', type: TransactionType.INCOME, color: '#3b82f6' },
-    // Gastos (EXPENSE)
-    { name: 'Infraestructura / Cloud', type: TransactionType.EXPENSE, color: '#f59e0b' },
-    { name: 'Sueldos y Honorarios', type: TransactionType.EXPENSE, color: '#ef4444' },
-    { name: 'Licencias de Software', type: TransactionType.EXPENSE, color: '#8b5cf6' },
-    { name: 'Marketing y Publicidad', type: TransactionType.EXPENSE, color: '#ec4899' },
-    { name: 'Impuestos y Contabilidad', type: TransactionType.EXPENSE, color: '#6366f1' },
-    { name: 'Gastos Operativos / Oficina', type: TransactionType.EXPENSE, color: '#64748b' },
-  ]
-
-  const categoryMap: Record<string, number> = {}
-  for (const cat of categoriesData) {
-    const created = await prisma.category.upsert({
-      where: { name: cat.name },
-      update: { type: cat.type, color: cat.color },
-      create: cat,
-    })
-    categoryMap[cat.name] = created.id
-  }
-
-  // 2.5 Billing Config (Tarifa por persona inscripta)
+  // 2. Configuración de facturación de torneos
   await prisma.billingConfig.upsert({
     where: { id: 1 },
     update: {},
@@ -67,359 +39,780 @@ async function main() {
     },
   })
 
-  // 3. Projects (asegurar los 4 schemas de torneos + proyectos existentes)
-  const existingProjects = await prisma.project.findMany()
-  let projects = existingProjects
+  // 3. Categorías (incluyendo "Cobro de Torneo")
+  const categoriesData = [
+    { name: 'Cobro de Proyecto', type: TransactionType.INCOME, color: '#10b981', isActive: true },
+    { name: 'Abono / Mantenimiento Mensual', type: TransactionType.INCOME, color: '#14b8a6', isActive: true },
+    { name: 'Consultoría y Desarrollo', type: TransactionType.INCOME, color: '#06b6d4', isActive: true },
+    { name: 'Otros Ingresos', type: TransactionType.INCOME, color: '#3b82f6', isActive: true },
+    { name: 'Cobro de Torneo', type: TransactionType.INCOME, color: '#6366f1', isActive: true },
+    { name: 'Infraestructura / Cloud', type: TransactionType.EXPENSE, color: '#f59e0b', isActive: true },
+    { name: 'Sueldos y Honorarios', type: TransactionType.EXPENSE, color: '#ef4444', isActive: true },
+    { name: 'Licencias de Software', type: TransactionType.EXPENSE, color: '#8b5cf6', isActive: true },
+    { name: 'Marketing y Publicidad', type: TransactionType.EXPENSE, color: '#ec4899', isActive: true },
+    { name: 'Impuestos y Contabilidad', type: TransactionType.EXPENSE, color: '#6366f1', isActive: true },
+    { name: 'Gastos Operativos / Oficina', type: TransactionType.EXPENSE, color: '#64748b', isActive: true },
+  ]
 
-  if (existingProjects.length === 0) {
-    const initialProjects = [
-      {
-        name: 'Mintork Analytics',
-        clientName: 'Producto Interno / SaaS',
-        description: 'Plataforma BI y analítica empresarial.',
-        status: ProjectStatus.ACTIVE,
-        budget: 6000000,
-        startDate: new Date('2026-05-01T00:00:00Z'),
-      },
-      {
-        name: 'FlowEngine',
-        clientName: 'Cliente Corporativo Sur',
-        description: 'Automatización de flujos empresariales a medida.',
-        status: ProjectStatus.COMPLETED,
-        budget: 2800000,
-        startDate: new Date('2026-03-01T00:00:00Z'),
-        endDate: new Date('2026-09-30T00:00:00Z'),
-      },
-    ]
-
-    for (const proj of initialProjects) {
-      await prisma.project.create({ data: proj })
-    }
+  const categoryMap = new Map<string, number>()
+  for (const cat of categoriesData) {
+    const created = await prisma.category.upsert({
+      where: { name: cat.name },
+      update: { type: cat.type, color: cat.color, isActive: cat.isActive },
+      create: cat,
+    })
+    categoryMap.set(cat.name, created.id)
   }
 
-  const tournamentProjects = [
+  // 4. Proyectos históricos (incluyendo vinculación a schemas MySQL)
+  const projectsData = [
     {
       name: 'Copa Center Padel',
-      aliases: ['Copa Center Padel', 'Center Padel'],
       clientName: 'Center Padel Club',
       description: 'Plataforma de gestión y torneos en la nube para Copa Center Padel.',
       status: ProjectStatus.ACTIVE,
       budget: 4500000,
-      startDate: new Date('2026-06-01T00:00:00Z'),
+      startDate: new Date('2026-06-01T00:00:00.000Z'),
+      endDate: null,
       dbSchema: 'padel',
+      customPricePerPlayer: null,
     },
     {
       name: 'Encuentro Padel Azul',
-      aliases: ['Encuentro Padel Azul', 'Encuentro Padel'],
       clientName: 'Encuentro Padel',
       description: 'Sistema organizador de torneos y rankings para Encuentro Padel Azul.',
       status: ProjectStatus.ACTIVE,
       budget: 3200000,
-      startDate: new Date('2026-07-15T00:00:00Z'),
+      startDate: new Date('2026-07-15T00:00:00.000Z'),
+      endDate: null,
       dbSchema: 'encuentro',
+      customPricePerPlayer: null,
     },
     {
       name: 'La Pista Padel',
-      aliases: ['La Pista Padel', 'La Pista'],
       clientName: 'La Pista Padel',
-      description: 'Organizador de torneos y eventos para La Pista.',
+      description: null,
       status: ProjectStatus.ACTIVE,
-      budget: 2500000,
-      startDate: new Date('2026-08-01T00:00:00Z'),
+      budget: null,
+      startDate: new Date('2026-11-19T12:00:00.000Z'),
+      endDate: null,
       dbSchema: 'lapista',
+      customPricePerPlayer: null,
+    },
+    {
+      name: 'Meraki Gimnasio',
+      clientName: 'Meraki Gimnasio',
+      description: null,
+      status: ProjectStatus.ACTIVE,
+      budget: null,
+      startDate: new Date('2026-11-19T12:00:00.000Z'),
+      endDate: null,
+      dbSchema: null,
+      customPricePerPlayer: null,
     },
     {
       name: 'BYB Padel',
-      aliases: ['BYB Padel', 'ByB'],
-      clientName: 'ByB Padel',
-      description: 'Organizador de torneos y eventos para ByB.',
+      clientName: null,
+      description: null,
       status: ProjectStatus.ACTIVE,
-      budget: 2500000,
-      startDate: new Date('2026-08-01T00:00:00Z'),
+      budget: null,
+      startDate: new Date('2026-11-19T12:00:00.000Z'),
+      endDate: null,
       dbSchema: 'byb',
+      customPricePerPlayer: null,
+    },
+    {
+      name: 'Padel.net.ar',
+      clientName: null,
+      description: null,
+      status: ProjectStatus.ACTIVE,
+      budget: null,
+      startDate: new Date('2026-11-19T12:00:00.000Z'),
+      endDate: null,
+      dbSchema: null,
+      customPricePerPlayer: null,
+    },
+    {
+      name: 'TotalGym',
+      clientName: null,
+      description: null,
+      status: ProjectStatus.ACTIVE,
+      budget: null,
+      startDate: new Date('2026-11-19T12:00:00.000Z'),
+      endDate: null,
+      dbSchema: null,
+      customPricePerPlayer: null,
     },
   ]
 
-  for (const tp of tournamentProjects) {
+  const projectMap = new Map<string, number>()
+  for (const proj of projectsData) {
     const existing = await prisma.project.findFirst({
-      where: {
-        OR: [{ dbSchema: tp.dbSchema }, { name: { in: tp.aliases } }],
-      },
+      where: proj.dbSchema
+        ? { OR: [{ dbSchema: proj.dbSchema }, { name: proj.name }] }
+        : { name: proj.name },
     })
+
     if (existing) {
-      if (!existing.dbSchema) {
+      if (proj.dbSchema && !existing.dbSchema) {
         await prisma.project.update({
           where: { id: existing.id },
-          data: { dbSchema: tp.dbSchema },
+          data: { dbSchema: proj.dbSchema },
         })
       }
+      projectMap.set(proj.name, existing.id)
     } else {
-      await prisma.project.create({
-        data: {
-          name: tp.name,
-          clientName: tp.clientName,
-          description: tp.description,
-          status: tp.status,
-          budget: tp.budget,
-          startDate: tp.startDate,
-          dbSchema: tp.dbSchema,
-        },
-      })
+      const created = await prisma.project.create({ data: proj })
+      projectMap.set(proj.name, created.id)
     }
   }
 
-  projects = await prisma.project.findMany()
+  // 5. Histórico completo de movimientos (52 registros)
+  const historicalTransactions: Array<{
+    type: TransactionType
+    amount: number
+    date: string
+    description: string
+    reference: string | null
+    paymentMethod: PaymentMethod
+    status: TransactionStatus
+    projectName: string | null
+    categoryName: string
+  }> = [
+    {
+      type: TransactionType.EXPENSE,
+      amount: 46980,
+      date: '2025-12-06T12:00:00.000Z',
+      description: 'Primeros 3 meses server',
+      reference: null,
+      paymentMethod: PaymentMethod.CARD,
+      status: TransactionStatus.PAID,
+      projectName: null,
+      categoryName: 'Infraestructura / Cloud',
+    },
+    {
+      type: TransactionType.EXPENSE,
+      amount: 208800,
+      date: '2026-03-09T12:00:00.000Z',
+      description: 'Server 12 meses',
+      reference: null,
+      paymentMethod: PaymentMethod.CARD,
+      status: TransactionStatus.PAID,
+      projectName: null,
+      categoryName: 'Infraestructura / Cloud',
+    },
+    {
+      type: TransactionType.EXPENSE,
+      amount: 51508,
+      date: '2026-09-14T12:00:00.000Z',
+      description: 'Upgrade a 8gb de Ram',
+      reference: null,
+      paymentMethod: PaymentMethod.TRANSFER,
+      status: TransactionStatus.PAID,
+      projectName: null,
+      categoryName: 'Infraestructura / Cloud',
+    },
+    {
+      type: TransactionType.EXPENSE,
+      amount: 8500,
+      date: '2026-11-19T12:00:00.000Z',
+      description: 'Registro de Dominio NIC.ar',
+      reference: null,
+      paymentMethod: PaymentMethod.TRANSFER,
+      status: TransactionStatus.PAID,
+      projectName: 'TotalGym',
+      categoryName: 'Licencias de Software',
+    },
+    {
+      type: TransactionType.EXPENSE,
+      amount: 8500,
+      date: '2026-11-19T12:00:00.000Z',
+      description: 'Registro de Dominio NIC.ar',
+      reference: null,
+      paymentMethod: PaymentMethod.TRANSFER,
+      status: TransactionStatus.PAID,
+      projectName: 'Padel.net.ar',
+      categoryName: 'Licencias de Software',
+    },
+    {
+      type: TransactionType.EXPENSE,
+      amount: 8500,
+      date: '2026-11-19T12:00:00.000Z',
+      description: 'Registro de Dominio NIC.ar',
+      reference: null,
+      paymentMethod: PaymentMethod.TRANSFER,
+      status: TransactionStatus.PAID,
+      projectName: 'Meraki Gimnasio',
+      categoryName: 'Licencias de Software',
+    },
+    {
+      type: TransactionType.EXPENSE,
+      amount: 8500,
+      date: '2026-11-19T12:00:00.000Z',
+      description: 'Registro de Dominio NIC.ar',
+      reference: null,
+      paymentMethod: PaymentMethod.TRANSFER,
+      status: TransactionStatus.PAID,
+      projectName: 'La Pista Padel',
+      categoryName: 'Licencias de Software',
+    },
+    {
+      type: TransactionType.EXPENSE,
+      amount: 8500,
+      date: '2026-11-19T12:00:00.000Z',
+      description: 'Registro de Dominio NIC.ar',
+      reference: null,
+      paymentMethod: PaymentMethod.TRANSFER,
+      status: TransactionStatus.PAID,
+      projectName: 'Encuentro Padel Azul',
+      categoryName: 'Gastos Operativos / Oficina',
+    },
+    {
+      type: TransactionType.EXPENSE,
+      amount: 8500,
+      date: '2026-11-19T12:00:00.000Z',
+      description: 'Registro de Dominio NIC.ar',
+      reference: null,
+      paymentMethod: PaymentMethod.TRANSFER,
+      status: TransactionStatus.PAID,
+      projectName: 'Copa Center Padel',
+      categoryName: 'Licencias de Software',
+    },
+    {
+      type: TransactionType.EXPENSE,
+      amount: 8500,
+      date: '2026-11-19T12:00:00.000Z',
+      description: 'Registro de Dominio NIC.ar Padeltresarroyos y se borraron',
+      reference: null,
+      paymentMethod: PaymentMethod.TRANSFER,
+      status: TransactionStatus.PAID,
+      projectName: null,
+      categoryName: 'Gastos Operativos / Oficina',
+    },
+    {
+      type: TransactionType.EXPENSE,
+      amount: 8500,
+      date: '2026-11-19T12:00:00.000Z',
+      description: 'Registro de Dominio NIC.ar Mintorksoft.com.ar',
+      reference: null,
+      paymentMethod: PaymentMethod.TRANSFER,
+      status: TransactionStatus.PAID,
+      projectName: null,
+      categoryName: 'Gastos Operativos / Oficina',
+    },
+    {
+      type: TransactionType.EXPENSE,
+      amount: 30000,
+      date: '2026-01-15T12:00:00.000Z',
+      description: 'Resend 1 mes para ampliar mails',
+      reference: null,
+      paymentMethod: PaymentMethod.TRANSFER,
+      status: TransactionStatus.PAID,
+      projectName: 'Copa Center Padel',
+      categoryName: 'Infraestructura / Cloud',
+    },
+    {
+      type: TransactionType.INCOME,
+      amount: 156000,
+      date: '2026-09-30T12:00:00.000Z',
+      description: 'Torneo Semanal Sep-Oct',
+      reference: null,
+      paymentMethod: PaymentMethod.TRANSFER,
+      status: TransactionStatus.PAID,
+      projectName: 'Encuentro Padel Azul',
+      categoryName: 'Cobro de Torneo',
+    },
+    {
+      type: TransactionType.INCOME,
+      amount: 161200,
+      date: '2026-10-30T12:00:00.000Z',
+      description: 'Torneo Semanal Oct-Nov',
+      reference: null,
+      paymentMethod: PaymentMethod.TRANSFER,
+      status: TransactionStatus.PAID,
+      projectName: 'Encuentro Padel Azul',
+      categoryName: 'Cobro de Torneo',
+    },
+    {
+      type: TransactionType.INCOME,
+      amount: 161200,
+      date: '2026-12-19T12:00:00.000Z',
+      description: 'Torneo Semanal Nov-Dic (approx)',
+      reference: null,
+      paymentMethod: PaymentMethod.TRANSFER,
+      status: TransactionStatus.PENDING,
+      projectName: 'Encuentro Padel Azul',
+      categoryName: 'Cobro de Torneo',
+    },
+    {
+      type: TransactionType.INCOME,
+      amount: 54000,
+      date: '2026-03-25T12:00:00.000Z',
+      description: 'Semanal Marzo',
+      reference: null,
+      paymentMethod: PaymentMethod.CASH,
+      status: TransactionStatus.PAID,
+      projectName: 'Copa Center Padel',
+      categoryName: 'Cobro de Torneo',
+    },
+    {
+      type: TransactionType.INCOME,
+      amount: 112000,
+      date: '2026-04-11T12:00:00.000Z',
+      description: 'Semanal Cab6 Dam6 Abril',
+      reference: null,
+      paymentMethod: PaymentMethod.TRANSFER,
+      status: TransactionStatus.PAID,
+      projectName: 'Copa Center Padel',
+      categoryName: 'Cobro de Torneo',
+    },
+    {
+      type: TransactionType.INCOME,
+      amount: 130000,
+      date: '2026-04-29T12:00:00.000Z',
+      description: 'Semanal Cab5 Cab7 Abril',
+      reference: null,
+      paymentMethod: PaymentMethod.TRANSFER,
+      status: TransactionStatus.PAID,
+      projectName: 'Copa Center Padel',
+      categoryName: 'Cobro de Torneo',
+    },
+    {
+      type: TransactionType.INCOME,
+      amount: 102000,
+      date: '2026-05-13T12:00:00.000Z',
+      description: 'Semanal Cab7+6 Cab5+4 Mayo',
+      reference: null,
+      paymentMethod: PaymentMethod.TRANSFER,
+      status: TransactionStatus.PAID,
+      projectName: 'Copa Center Padel',
+      categoryName: 'Cobro de Torneo',
+    },
+    {
+      type: TransactionType.INCOME,
+      amount: 134000,
+      date: '2026-05-29T12:00:00.000Z',
+      description: 'Semanal Cab7 Cab6 Mayo',
+      reference: null,
+      paymentMethod: PaymentMethod.TRANSFER,
+      status: TransactionStatus.PAID,
+      projectName: 'Copa Center Padel',
+      categoryName: 'Cobro de Torneo',
+    },
+    {
+      type: TransactionType.INCOME,
+      amount: 32000,
+      date: '2026-06-24T12:00:00.000Z',
+      description: 'Mixto Suma 12',
+      reference: null,
+      paymentMethod: PaymentMethod.TRANSFER,
+      status: TransactionStatus.PAID,
+      projectName: 'Copa Center Padel',
+      categoryName: 'Cobro de Torneo',
+    },
+    {
+      type: TransactionType.INCOME,
+      amount: 42000,
+      date: '2026-07-01T12:00:00.000Z',
+      description: 'Semanal Cab5 Julio',
+      reference: null,
+      paymentMethod: PaymentMethod.TRANSFER,
+      status: TransactionStatus.PAID,
+      projectName: 'Copa Center Padel',
+      categoryName: 'Cobro de Torneo',
+    },
+    {
+      type: TransactionType.INCOME,
+      amount: 42000,
+      date: '2026-07-10T12:00:00.000Z',
+      description: 'Semanal Cab6 Julio',
+      reference: null,
+      paymentMethod: PaymentMethod.TRANSFER,
+      status: TransactionStatus.PAID,
+      projectName: 'Copa Center Padel',
+      categoryName: 'Cobro de Torneo',
+    },
+    {
+      type: TransactionType.INCOME,
+      amount: 50000,
+      date: '2026-07-15T12:00:00.000Z',
+      description: 'Semanal Cab7 Julio',
+      reference: null,
+      paymentMethod: PaymentMethod.TRANSFER,
+      status: TransactionStatus.PAID,
+      projectName: 'Copa Center Padel',
+      categoryName: 'Cobro de Torneo',
+    },
+    {
+      type: TransactionType.INCOME,
+      amount: 28000,
+      date: '2026-08-05T12:00:00.000Z',
+      description: 'Semanal Cab5 Agosto',
+      reference: null,
+      paymentMethod: PaymentMethod.TRANSFER,
+      status: TransactionStatus.PAID,
+      projectName: 'Copa Center Padel',
+      categoryName: 'Cobro de Torneo',
+    },
+    {
+      type: TransactionType.INCOME,
+      amount: 72000,
+      date: '2026-08-07T12:00:00.000Z',
+      description: 'Semanal Cab6 Dam6 Agosto',
+      reference: null,
+      paymentMethod: PaymentMethod.TRANSFER,
+      status: TransactionStatus.PAID,
+      projectName: 'Copa Center Padel',
+      categoryName: 'Abono / Mantenimiento Mensual',
+    },
+    {
+      type: TransactionType.INCOME,
+      amount: 94000,
+      date: '2026-09-01T12:00:00.000Z',
+      description: 'Semanal Cab7 Dam7 Septiembre',
+      reference: null,
+      paymentMethod: PaymentMethod.TRANSFER,
+      status: TransactionStatus.PAID,
+      projectName: 'Copa Center Padel',
+      categoryName: 'Cobro de Torneo',
+    },
+    {
+      type: TransactionType.INCOME,
+      amount: 86000,
+      date: '2026-09-22T12:00:00.000Z',
+      description: 'Semanal Cab6 Dam6 Septiembre',
+      reference: null,
+      paymentMethod: PaymentMethod.TRANSFER,
+      status: TransactionStatus.PAID,
+      projectName: 'Copa Center Padel',
+      categoryName: 'Cobro de Torneo',
+    },
+    {
+      type: TransactionType.INCOME,
+      amount: 124000,
+      date: '2026-11-24T12:00:00.000Z',
+      description: 'Semanal Cab5 Cab7 Octubre',
+      reference: null,
+      paymentMethod: PaymentMethod.TRANSFER,
+      status: TransactionStatus.PENDING,
+      projectName: 'Copa Center Padel',
+      categoryName: 'Cobro de Torneo',
+    },
+    {
+      type: TransactionType.INCOME,
+      amount: 116000,
+      date: '2026-11-24T12:00:00.000Z',
+      description: 'Semanal Cab6 Dam7 Noviembre',
+      reference: null,
+      paymentMethod: PaymentMethod.TRANSFER,
+      status: TransactionStatus.PENDING,
+      projectName: 'Copa Center Padel',
+      categoryName: 'Cobro de Torneo',
+    },
+    {
+      type: TransactionType.INCOME,
+      amount: 102000,
+      date: '2026-11-24T12:00:00.000Z',
+      description: 'Semanal Cab7 Dam6 Nov',
+      reference: null,
+      paymentMethod: PaymentMethod.TRANSFER,
+      status: TransactionStatus.PENDING,
+      projectName: 'Copa Center Padel',
+      categoryName: 'Cobro de Torneo',
+    },
+    {
+      type: TransactionType.INCOME,
+      amount: 42000,
+      date: '2026-12-24T12:00:00.000Z',
+      description: 'Suma11 Dam Suma11 Cab (aprox)',
+      reference: null,
+      paymentMethod: PaymentMethod.TRANSFER,
+      status: TransactionStatus.PENDING,
+      projectName: 'Copa Center Padel',
+      categoryName: 'Cobro de Torneo',
+    },
+    {
+      type: TransactionType.INCOME,
+      amount: 294000,
+      date: '2026-02-09T12:00:00.000Z',
+      description: 'Pares Etapa 1',
+      reference: null,
+      paymentMethod: PaymentMethod.TRANSFER,
+      status: TransactionStatus.PAID,
+      projectName: 'Copa Center Padel',
+      categoryName: 'Cobro de Torneo',
+    },
+    {
+      type: TransactionType.INCOME,
+      amount: 286000,
+      date: '2026-02-23T12:00:00.000Z',
+      description: 'Impares Etapa 1',
+      reference: null,
+      paymentMethod: PaymentMethod.TRANSFER,
+      status: TransactionStatus.PAID,
+      projectName: 'Copa Center Padel',
+      categoryName: 'Cobro de Torneo',
+    },
+    {
+      type: TransactionType.INCOME,
+      amount: 330000,
+      date: '2026-03-09T12:00:00.000Z',
+      description: 'Pares Etapa 2',
+      reference: null,
+      paymentMethod: PaymentMethod.TRANSFER,
+      status: TransactionStatus.PAID,
+      projectName: 'Copa Center Padel',
+      categoryName: 'Cobro de Torneo',
+    },
+    {
+      type: TransactionType.INCOME,
+      amount: 352000,
+      date: '2026-03-24T12:00:00.000Z',
+      description: 'Impares Etapa 2',
+      reference: null,
+      paymentMethod: PaymentMethod.TRANSFER,
+      status: TransactionStatus.PAID,
+      projectName: 'Copa Center Padel',
+      categoryName: 'Cobro de Torneo',
+    },
+    {
+      type: TransactionType.INCOME,
+      amount: 332000,
+      date: '2026-04-05T12:00:00.000Z',
+      description: 'Pares Etapa 3',
+      reference: null,
+      paymentMethod: PaymentMethod.TRANSFER,
+      status: TransactionStatus.PAID,
+      projectName: 'Copa Center Padel',
+      categoryName: 'Cobro de Torneo',
+    },
+    {
+      type: TransactionType.INCOME,
+      amount: 336000,
+      date: '2026-04-27T12:00:00.000Z',
+      description: 'Impares Etapa 3',
+      reference: null,
+      paymentMethod: PaymentMethod.TRANSFER,
+      status: TransactionStatus.PAID,
+      projectName: 'Copa Center Padel',
+      categoryName: 'Cobro de Torneo',
+    },
+    {
+      type: TransactionType.INCOME,
+      amount: 336000,
+      date: '2026-05-11T12:00:00.000Z',
+      description: 'Pares Etapa 4',
+      reference: null,
+      paymentMethod: PaymentMethod.TRANSFER,
+      status: TransactionStatus.PAID,
+      projectName: 'Copa Center Padel',
+      categoryName: 'Cobro de Torneo',
+    },
+    {
+      type: TransactionType.INCOME,
+      amount: 340000,
+      date: '2026-05-24T12:00:00.000Z',
+      description: 'Impares Etapa 4',
+      reference: null,
+      paymentMethod: PaymentMethod.TRANSFER,
+      status: TransactionStatus.PAID,
+      projectName: 'Copa Center Padel',
+      categoryName: 'Cobro de Torneo',
+    },
+    {
+      type: TransactionType.INCOME,
+      amount: 342000,
+      date: '2026-06-08T12:00:00.000Z',
+      description: 'Pares Etapa 5',
+      reference: null,
+      paymentMethod: PaymentMethod.TRANSFER,
+      status: TransactionStatus.PAID,
+      projectName: 'Copa Center Padel',
+      categoryName: 'Cobro de Torneo',
+    },
+    {
+      type: TransactionType.INCOME,
+      amount: 342000,
+      date: '2026-06-22T12:00:00.000Z',
+      description: 'Impares Etapa 5',
+      reference: null,
+      paymentMethod: PaymentMethod.TRANSFER,
+      status: TransactionStatus.PAID,
+      projectName: 'Copa Center Padel',
+      categoryName: 'Cobro de Torneo',
+    },
+    {
+      type: TransactionType.INCOME,
+      amount: 316000,
+      date: '2026-07-06T12:00:00.000Z',
+      description: 'Pares Etapa 6',
+      reference: null,
+      paymentMethod: PaymentMethod.TRANSFER,
+      status: TransactionStatus.PAID,
+      projectName: 'Copa Center Padel',
+      categoryName: 'Cobro de Torneo',
+    },
+    {
+      type: TransactionType.INCOME,
+      amount: 316000,
+      date: '2026-07-27T12:00:00.000Z',
+      description: 'Impares Etapa 6',
+      reference: null,
+      paymentMethod: PaymentMethod.TRANSFER,
+      status: TransactionStatus.PAID,
+      projectName: 'Copa Center Padel',
+      categoryName: 'Cobro de Torneo',
+    },
+    {
+      type: TransactionType.INCOME,
+      amount: 274000,
+      date: '2026-08-17T12:00:00.000Z',
+      description: 'Pares Etapa 7',
+      reference: null,
+      paymentMethod: PaymentMethod.TRANSFER,
+      status: TransactionStatus.PAID,
+      projectName: 'Copa Center Padel',
+      categoryName: 'Cobro de Torneo',
+    },
+    {
+      type: TransactionType.INCOME,
+      amount: 312000,
+      date: '2026-08-30T12:00:00.000Z',
+      description: 'Impares Etapa 7',
+      reference: null,
+      paymentMethod: PaymentMethod.TRANSFER,
+      status: TransactionStatus.PAID,
+      projectName: 'Copa Center Padel',
+      categoryName: 'Cobro de Torneo',
+    },
+    {
+      type: TransactionType.INCOME,
+      amount: 254000,
+      date: '2026-09-14T12:00:00.000Z',
+      description: 'Pares Etapa 8',
+      reference: null,
+      paymentMethod: PaymentMethod.TRANSFER,
+      status: TransactionStatus.PAID,
+      projectName: 'Copa Center Padel',
+      categoryName: 'Cobro de Torneo',
+    },
+    {
+      type: TransactionType.INCOME,
+      amount: 280000,
+      date: '2026-09-28T12:00:00.000Z',
+      description: 'Impares Etapa 8',
+      reference: null,
+      paymentMethod: PaymentMethod.TRANSFER,
+      status: TransactionStatus.PAID,
+      projectName: 'Copa Center Padel',
+      categoryName: 'Cobro de Torneo',
+    },
+    {
+      type: TransactionType.INCOME,
+      amount: 286000,
+      date: '2026-11-24T12:00:00.000Z',
+      description: 'Pares Etapa 9',
+      reference: null,
+      paymentMethod: PaymentMethod.TRANSFER,
+      status: TransactionStatus.PENDING,
+      projectName: 'Copa Center Padel',
+      categoryName: 'Cobro de Torneo',
+    },
+    {
+      type: TransactionType.INCOME,
+      amount: 304000,
+      date: '2026-11-24T12:00:00.000Z',
+      description: 'Impares Etapa 9',
+      reference: null,
+      paymentMethod: PaymentMethod.TRANSFER,
+      status: TransactionStatus.PENDING,
+      projectName: 'Copa Center Padel',
+      categoryName: 'Cobro de Torneo',
+    },
+    {
+      type: TransactionType.INCOME,
+      amount: 280000,
+      date: '2026-11-24T12:00:00.000Z',
+      description: 'Pares Etapa 10',
+      reference: null,
+      paymentMethod: PaymentMethod.TRANSFER,
+      status: TransactionStatus.PENDING,
+      projectName: 'Copa Center Padel',
+      categoryName: 'Cobro de Torneo',
+    },
+    {
+      type: TransactionType.INCOME,
+      amount: 278000,
+      date: '2026-11-24T12:00:00.000Z',
+      description: 'Impares Etapa 10',
+      reference: null,
+      paymentMethod: PaymentMethod.TRANSFER,
+      status: TransactionStatus.PENDING,
+      projectName: 'Copa Center Padel',
+      categoryName: 'Cobro de Torneo',
+    },
+  ]
 
-  const findProject = (name: string) => projects.find((p) => p.name === name)?.id ?? null
+  // Evitar duplicados si la DB ya tiene los registros cargados
+  const existingRows = await prisma.transaction.findMany({
+    include: {
+      project: { select: { name: true } },
+      category: { select: { name: true } },
+    },
+  })
 
-  // 4. Sample Transactions (only if empty)
-  const txCount = await prisma.transaction.count()
-  if (txCount === 0) {
-    const now = new Date()
-    const monthsAgo = (m: number, day: number) => {
-      const d = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() - m, day))
-      return d
-    }
+  const makeKey = (item: {
+    type: string
+    amount: number | string
+    date: Date | string
+    description: string
+    projectName: string | null
+    categoryName: string
+  }) => {
+    const iso = (item.date instanceof Date ? item.date : new Date(item.date)).toISOString()
+    return `${item.type}|${Number(item.amount)}|${iso}|${item.description}|${item.projectName ?? 'GLOBAL'}|${item.categoryName}`
+  }
 
-    const sampleTransactions = [
-      // Hace 3 meses
-      {
-        type: TransactionType.INCOME,
-        amount: 1850000,
-        date: monthsAgo(3, 5),
-        description: 'Anticipo desarrollo módulo principal FlowEngine',
-        reference: 'FC-A-00012',
-        paymentMethod: PaymentMethod.TRANSFER,
-        status: TransactionStatus.PAID,
-        projectId: findProject('FlowEngine'),
-        categoryId: categoryMap['Cobro de Proyecto'],
-        createdById: admin.id,
-      },
-      {
-        type: TransactionType.EXPENSE,
-        amount: 420000,
-        date: monthsAgo(3, 12),
-        description: 'Honorarios equipo desarrollo backend (Global)',
-        reference: 'REC-0088',
-        paymentMethod: PaymentMethod.TRANSFER,
-        status: TransactionStatus.PAID,
-        projectId: null,
-        categoryId: categoryMap['Sueldos y Honorarios'],
-        createdById: admin.id,
-      },
-      {
-        type: TransactionType.EXPENSE,
-        amount: 145000,
-        date: monthsAgo(3, 18),
-        description: 'Servidores AWS & Cloudflare generales empresa',
-        reference: 'AWS-2026-08',
-        paymentMethod: PaymentMethod.CARD,
-        status: TransactionStatus.PAID,
-        projectId: null,
-        categoryId: categoryMap['Infraestructura / Cloud'],
-        createdById: admin.id,
-      },
+  const existingKeys = new Set(
+    existingRows.map((r) =>
+      makeKey({
+        type: r.type,
+        amount: Number(r.amount),
+        date: r.date,
+        description: r.description,
+        projectName: r.project?.name ?? null,
+        categoryName: r.category.name,
+      })
+    )
+  )
 
-      // Hace 2 meses
-      {
-        type: TransactionType.INCOME,
-        amount: 1450000,
-        date: monthsAgo(2, 4),
-        description: 'Entrega final FlowEngine',
-        reference: 'FC-A-00018',
-        paymentMethod: PaymentMethod.TRANSFER,
-        status: TransactionStatus.PAID,
-        projectId: findProject('FlowEngine'),
-        categoryId: categoryMap['Cobro de Proyecto'],
+  const toInsert = historicalTransactions
+    .filter((tx) => !existingKeys.has(makeKey(tx)))
+    .map((tx) => {
+      const categoryId = categoryMap.get(tx.categoryName)
+      if (!categoryId) {
+        throw new Error(`Categoría faltante en seed: ${tx.categoryName}`)
+      }
+      const projectId = tx.projectName ? (projectMap.get(tx.projectName) ?? null) : null
+      return {
+        type: tx.type,
+        amount: tx.amount,
+        date: new Date(tx.date),
+        description: tx.description,
+        reference: tx.reference,
+        paymentMethod: tx.paymentMethod,
+        status: tx.status,
+        projectId,
+        categoryId,
         createdById: admin.id,
-      },
-      {
-        type: TransactionType.INCOME,
-        amount: 950000,
-        date: monthsAgo(2, 10),
-        description: 'Hito 1 - Plataforma Copa Center Padel',
-        reference: 'FC-B-00041',
-        paymentMethod: PaymentMethod.TRANSFER,
-        status: TransactionStatus.PAID,
-        projectId: findProject('Copa Center Padel'),
-        categoryId: categoryMap['Cobro de Proyecto'],
-        createdById: admin.id,
-      },
-      {
-        type: TransactionType.EXPENSE,
-        amount: 580000,
-        date: monthsAgo(2, 15),
-        description: 'Sueldos y honorarios mensuales',
-        reference: 'LIQ-2026-09',
-        paymentMethod: PaymentMethod.TRANSFER,
-        status: TransactionStatus.PAID,
-        projectId: null,
-        categoryId: categoryMap['Sueldos y Honorarios'],
-        createdById: admin.id,
-      },
-      {
-        type: TransactionType.EXPENSE,
-        amount: 120000,
-        date: monthsAgo(2, 20),
-        description: 'Hosting dedicado y base de datos Copa Center Padel',
-        reference: 'DO-9921',
-        paymentMethod: PaymentMethod.CARD,
-        status: TransactionStatus.PAID,
-        projectId: findProject('Copa Center Padel'),
-        categoryId: categoryMap['Infraestructura / Cloud'],
-        createdById: admin.id,
-      },
+      }
+    })
 
-      // Hace 1 mes
-      {
-        type: TransactionType.INCOME,
-        amount: 1100000,
-        date: monthsAgo(1, 6),
-        description: 'Implementación torneos Encuentro Padel Azul',
-        reference: 'FC-B-00055',
-        paymentMethod: PaymentMethod.TRANSFER,
-        status: TransactionStatus.PAID,
-        projectId: findProject('Encuentro Padel Azul'),
-        categoryId: categoryMap['Cobro de Proyecto'],
-        createdById: admin.id,
-      },
-      {
-        type: TransactionType.INCOME,
-        amount: 650000,
-        date: monthsAgo(1, 12),
-        description: 'Suscripciones SaaS Mintork Analytics',
-        reference: 'MP-44210',
-        paymentMethod: PaymentMethod.TRANSFER,
-        status: TransactionStatus.PAID,
-        projectId: findProject('Mintork Analytics'),
-        categoryId: categoryMap['Abono / Mantenimiento Mensual'],
-        createdById: admin.id,
-      },
-      {
-        type: TransactionType.INCOME,
-        amount: 450000,
-        date: monthsAgo(1, 20),
-        description: 'Consultoría técnica general a tercero',
-        reference: 'FC-C-00011',
-        paymentMethod: PaymentMethod.TRANSFER,
-        status: TransactionStatus.PAID,
-        projectId: null,
-        categoryId: categoryMap['Consultoría y Desarrollo'],
-        createdById: admin.id,
-      },
-      {
-        type: TransactionType.EXPENSE,
-        amount: 640000,
-        date: monthsAgo(1, 14),
-        description: 'Sueldos y honorarios mensuales',
-        reference: 'LIQ-2026-10',
-        paymentMethod: PaymentMethod.TRANSFER,
-        status: TransactionStatus.PAID,
-        projectId: null,
-        categoryId: categoryMap['Sueldos y Honorarios'],
-        createdById: admin.id,
-      },
-      {
-        type: TransactionType.EXPENSE,
-        amount: 195000,
-        date: monthsAgo(1, 22),
-        description: 'Estudio contable e impuestos mensuales (Global)',
-        reference: 'EST-1022',
-        paymentMethod: PaymentMethod.TRANSFER,
-        status: TransactionStatus.PAID,
-        projectId: null,
-        categoryId: categoryMap['Impuestos y Contabilidad'],
-        createdById: admin.id,
-      },
-
-      // Mes actual
-      {
-        type: TransactionType.INCOME,
-        amount: 1250000,
-        date: monthsAgo(0, 3),
-        description: 'Abono mensual + mejoras Copa Center Padel',
-        reference: 'FC-B-00067',
-        paymentMethod: PaymentMethod.TRANSFER,
-        status: TransactionStatus.PAID,
-        projectId: findProject('Copa Center Padel'),
-        categoryId: categoryMap['Abono / Mantenimiento Mensual'],
-        createdById: admin.id,
-      },
-      {
-        type: TransactionType.INCOME,
-        amount: 780000,
-        date: monthsAgo(0, 8),
-        description: 'Suscripciones mensuales Mintork Analytics',
-        reference: 'MP-51200',
-        paymentMethod: PaymentMethod.TRANSFER,
-        status: TransactionStatus.PAID,
-        projectId: findProject('Mintork Analytics'),
-        categoryId: categoryMap['Abono / Mantenimiento Mensual'],
-        createdById: admin.id,
-      },
-      {
-        type: TransactionType.INCOME,
-        amount: 550000,
-        date: monthsAgo(0, 14),
-        description: 'Mantenimiento Encuentro Padel Azul (Pendiente cobro)',
-        reference: 'FC-B-00070',
-        paymentMethod: PaymentMethod.TRANSFER,
-        status: TransactionStatus.PENDING,
-        projectId: findProject('Encuentro Padel Azul'),
-        categoryId: categoryMap['Abono / Mantenimiento Mensual'],
-        createdById: admin.id,
-      },
-      {
-        type: TransactionType.EXPENSE,
-        amount: 185000,
-        date: monthsAgo(0, 5),
-        description: 'Infraestructura Cloud + Vercel + Resend (Global)',
-        reference: 'CLOUD-1105',
-        paymentMethod: PaymentMethod.CARD,
-        status: TransactionStatus.PAID,
-        projectId: null,
-        categoryId: categoryMap['Infraestructura / Cloud'],
-        createdById: admin.id,
-      },
-      {
-        type: TransactionType.EXPENSE,
-        amount: 210000,
-        date: monthsAgo(0, 10),
-        description: 'Campaña Meta Ads para Encuentro Padel Azul',
-        reference: 'META-8831',
-        paymentMethod: PaymentMethod.CARD,
-        status: TransactionStatus.PAID,
-        projectId: findProject('Encuentro Padel Azul'),
-        categoryId: categoryMap['Marketing y Publicidad'],
-        createdById: admin.id,
-      },
-      {
-        type: TransactionType.EXPENSE,
-        amount: 95000,
-        date: monthsAgo(0, 12),
-        description: 'Licencias herramientas IA y GitHub Copilot (Global)',
-        reference: 'LIC-2026-11',
-        paymentMethod: PaymentMethod.CARD,
-        status: TransactionStatus.PAID,
-        projectId: null,
-        categoryId: categoryMap['Licencias de Software'],
-        createdById: admin.id,
-      },
-      {
-        type: TransactionType.EXPENSE,
-        amount: 260000,
-        date: monthsAgo(0, 15),
-        description: 'Alquiler oficina y servicios (Pendiente pago)',
-        reference: 'ALQ-1126',
-        paymentMethod: PaymentMethod.TRANSFER,
-        status: TransactionStatus.PENDING,
-        projectId: null,
-        categoryId: categoryMap['Gastos Operativos / Oficina'],
-        createdById: admin.id,
-      },
-    ]
-
-    await prisma.transaction.createMany({ data: sampleTransactions })
+  if (toInsert.length > 0) {
+    await prisma.transaction.createMany({ data: toInsert })
+    console.log(`Insertados ${toInsert.length} movimientos históricos.`)
+  } else {
+    console.log('Todos los movimientos históricos ya existen en la DB (0 duplicados).')
   }
 
   console.log('Seed completed successfully!')
