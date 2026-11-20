@@ -35,7 +35,7 @@ async function main() {
     create: {
       id: 1,
       pricePerPlayer: 1300,
-      autoSyncOnPlaying: true,
+      autoSyncOnPlaying: false,
     },
   })
 

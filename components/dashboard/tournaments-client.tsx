@@ -58,7 +58,6 @@ import {
 } from '@/components/ui/alert-dialog'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import { Switch } from '@/components/ui/switch'
 import {
   Select,
   SelectContent,
@@ -108,7 +107,6 @@ export function TournamentsClient({ initialData, userRole }: TournamentsClientPr
 
   const [data, setData] = useState<TournamentSyncDashboardDTO>(initialData)
   const [priceInput, setPriceInput] = useState<string>(String(initialData.config.pricePerPlayer))
-  const [autoSync, setAutoSync] = useState<boolean>(initialData.config.autoSyncOnPlaying)
   const [savingConfig, setSavingConfig] = useState(false)
   const [syncingAll, setSyncingAll] = useState(false)
   const [busyKey, setBusyKey] = useState<string | null>(null)
@@ -134,19 +132,12 @@ export function TournamentsClient({ initialData, userRole }: TournamentsClientPr
   async function refreshSync(showToast = true) {
     setSyncingAll(true)
     try {
-      const fresh = await getTournamentSyncDashboard(true)
+      const fresh = await getTournamentSyncDashboard(false)
       setData(fresh)
       setPriceInput(String(fresh.config.pricePerPlayer))
-      setAutoSync(fresh.config.autoSyncOnPlaying)
       router.refresh()
       if (showToast) {
-        if (fresh.autoCreatedCount > 0) {
-          toast.success(
-            `Sincronización completada: se crearon ${fresh.autoCreatedCount} cobro(s) pendiente(s) en ARS.`
-          )
-        } else {
-          toast.success('Schemas sincronizados. Todo está al día.')
-        }
+        toast.success('Schemas actualizados. Revisa los eventos listos para aprobar.')
       }
     } catch {
       toast.error('Error al sincronizar con los schemas MySQL')
@@ -167,7 +158,7 @@ export function TournamentsClient({ initialData, userRole }: TournamentsClientPr
     try {
       const res = await updateBillingConfigAction({
         pricePerPlayer: parsedPrice,
-        autoSyncOnPlaying: autoSync,
+        autoSyncOnPlaying: false,
       })
       if (!res.success) {
         toast.error(res.error ?? 'Error al guardar configuración')
@@ -338,9 +329,9 @@ export function TournamentsClient({ initialData, userRole }: TournamentsClientPr
             Cobros de Torneos (Multi-Schema)
           </h1>
           <p className="text-sm text-muted-foreground">
-            Lectura directa en MySQL de los eventos en producción. Al pasar a{' '}
-            <strong className="text-foreground">Jugándose</strong> se genera automáticamente la entrada como{' '}
-            <strong className="text-amber-400">Pendiente</strong>.
+            Lectura en tiempo real desde MySQL de los eventos en producción. Los eventos en estado{' '}
+            <strong className="text-foreground">Jugándose</strong> aparecen para tu revisión y solo se agregan como{' '}
+            <strong className="text-amber-400">Pendiente</strong> cuando los apruebas manualmente.
           </p>
         </div>
 
@@ -357,7 +348,7 @@ export function TournamentsClient({ initialData, userRole }: TournamentsClientPr
             ) : (
               <RefreshCw className="mr-2 h-4 w-4" />
             )}
-            Sincronizar Schemas Ahora
+            Actualizar Vista de Schemas
           </Button>
         </div>
       </div>
@@ -392,21 +383,8 @@ export function TournamentsClient({ initialData, userRole }: TournamentsClientPr
               </div>
             </div>
 
-            <div className="flex items-center gap-3 rounded-lg border border-border/60 bg-secondary/30 px-4 py-2.5">
-              <Switch
-                id="auto-sync-switch"
-                checked={autoSync}
-                onCheckedChange={setAutoSync}
-                disabled={!canEdit || savingConfig}
-              />
-              <div>
-                <Label htmlFor="auto-sync-switch" className="cursor-pointer text-sm">
-                  Auto-cargar al pasar a &ldquo;Jugándose&rdquo;
-                </Label>
-                <p className="text-xs text-muted-foreground">
-                  Crea la entrada pendiente automáticamente al abrir el dashboard o vía cron.
-                </p>
-              </div>
+            <div className="flex-1 rounded-lg border border-border/60 bg-secondary/30 px-4 py-2.5 text-xs text-muted-foreground">
+              <strong className="text-foreground">Aprobación manual activa:</strong> al visitar el dashboard o actualizar schemas no se cargan movimientos automáticamente ni se duplican torneos históricos ya cargados a mano.
             </div>
 
             {canEdit && (
@@ -668,13 +646,18 @@ export function TournamentsClient({ initialData, userRole }: TournamentsClientPr
                                 </div>
                               )}
                             </div>
+                          ) : ev.state === 'JUGANDOSE' && ev.parejasInscriptas > 0 ? (
+                            <Badge className="gap-1 border-amber-500/40 bg-amber-500/15 text-amber-300" variant="outline">
+                              <Clock className="h-3 w-3" />
+                              Listo para aprobar
+                            </Badge>
                           ) : (
                             <span className="text-xs text-muted-foreground">
-                              {ev.state === 'ABIERTO' || ev.state === 'CERRADO'
-                                ? 'Esperando inicio ("Jugándose")'
+                              {ev.state === 'FINALIZADO'
+                                ? 'No incluido / Histórico'
                                 : ev.parejasInscriptas === 0
                                   ? 'Sin parejas inscriptas'
-                                  : 'Pendiente de sincronizar'}
+                                  : 'Esperando inicio ("Jugándose")'}
                             </span>
                           )}
                         </TableCell>
@@ -713,15 +696,17 @@ export function TournamentsClient({ initialData, userRole }: TournamentsClientPr
                               {!ev.transaction && ev.parejasInscriptas > 0 && (
                                 <Button
                                   size="sm"
-                                  variant="outline"
+                                  variant={ev.state === 'JUGANDOSE' ? 'default' : 'outline'}
                                   className="h-8 text-xs"
                                   disabled={isBusy}
                                   onClick={() => handleSyncEvent(ev)}
                                 >
                                   {isBusy ? (
                                     <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                                  ) : ev.state === 'JUGANDOSE' || ev.state === 'FINALIZADO' ? (
-                                    'Cargar Pendiente'
+                                  ) : ev.state === 'JUGANDOSE' ? (
+                                    'Aprobar e Incluir Pendiente'
+                                  ) : ev.state === 'FINALIZADO' ? (
+                                    'Incluir Pendiente'
                                   ) : (
                                     'Adelantar Cobro'
                                   )}

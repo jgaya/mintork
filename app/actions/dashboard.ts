@@ -2,7 +2,6 @@
 
 import { prisma } from '@/lib/prisma'
 import { requireApiAuth } from '@/lib/auth'
-import { syncPlayingEventsInternal } from '@/app/actions/tournament-sync'
 import type { DashboardData, PeriodFilter, TransactionDTO } from '@/lib/types'
 
 function getPeriodStartDate(period: PeriodFilter): Date | undefined {
@@ -28,17 +27,7 @@ function formatMonthLabel(yearMonth: string): string {
 }
 
 export async function getDashboardData(period: PeriodFilter = 'all'): Promise<DashboardData> {
-  const session = await requireApiAuth()
-
-  // Auto-sincroniza en estado PENDING eventos que hayan pasado a "Jugándose" (si autoSyncOnPlaying está activo)
-  try {
-    await syncPlayingEventsInternal({
-      respectAutoFlag: true,
-      createdById: session.userId,
-    })
-  } catch (err) {
-    console.error('Error en auto-sync de torneos:', err)
-  }
+  await requireApiAuth()
 
   const startDate = getPeriodStartDate(period)
   const dateFilter = startDate ? { date: { gte: startDate } } : {}

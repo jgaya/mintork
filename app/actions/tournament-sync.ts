@@ -2,7 +2,6 @@
 
 import { revalidatePath } from 'next/cache'
 import { z } from 'zod'
-import { Prisma } from '@/generated/prisma/client'
 import { prisma } from '@/lib/prisma'
 import { requireApiAuth } from '@/lib/auth'
 import { formatARS } from '@/lib/format'
@@ -226,7 +225,7 @@ async function ensureBillingConfig() {
     create: {
       id: 1,
       pricePerPlayer: 1300,
-      autoSyncOnPlaying: true,
+      autoSyncOnPlaying: false,
     },
   })
 }
@@ -268,21 +267,19 @@ function buildTournamentTxDescription(
 }
 
 /**
- * Sincroniza automáticamente en estado PENDING los eventos que ya pasaron a "Jugándose" (o "Finalizado")
- * en los schemas configurados. Usado tanto desde el dashboard como desde el endpoint de cron.
+ * Inspecciona los eventos en los schemas configurados sin insertar movimientos automáticamente.
+ * La inclusión en el dashboard como Pendiente requiere aprobación explícita del usuario.
  */
-export async function syncPlayingEventsInternal(options?: {
+export async function syncPlayingEventsInternal(_options?: {
   respectAutoFlag?: boolean
   createdById?: number | null
 }): Promise<TournamentSyncDashboardDTO> {
   const configRow = await ensureBillingConfig()
   const config: BillingConfigDTO = {
     pricePerPlayer: Number(configRow.pricePerPlayer),
-    autoSyncOnPlaying: configRow.autoSyncOnPlaying,
+    autoSyncOnPlaying: false,
     updatedAt: configRow.updatedAt.toISOString(),
   }
-
-  const shouldCreateAuto = options?.respectAutoFlag ? config.autoSyncOnPlaying : true
 
   const [allProjectsRaw, detectedMySQLSchemas] = await Promise.all([
     prisma.project.findMany({
@@ -313,11 +310,9 @@ export async function syncPlayingEventsInternal(options?: {
       .map((t) => [t.externalKey!, t])
   )
 
-  const incomeCategoryId = await ensureIncomeCategoryId()
-
   const schemas: SchemaSyncStatusDTO[] = []
   const events: ExternalEventoSyncRow[] = []
-  let autoCreatedCount = 0
+  const autoCreatedCount = 0
 
   for (const project of linkedProjects) {
     const dbSchema = project.dbSchema!
@@ -382,46 +377,7 @@ export async function syncPlayingEventsInternal(options?: {
       }
 
       const externalKey = `${dbSchema}:evento:${eventoId}`
-      let linkedTx = txByExternalKey.get(externalKey) ?? null
-
-      // Auto-crear Entrada en estado PENDING cuando el evento pasa a Jugándose (o Finalizado)
-      if (!linkedTx && shouldCreateAuto && isPlayingOrFinished && parejasInscriptas > 0) {
-        try {
-          linkedTx = await prisma.transaction.create({
-            data: {
-              type: 'INCOME',
-              amount: calculatedAmount,
-              date: new Date(),
-              description: buildTournamentTxDescription(
-                row.nombre,
-                parejasInscriptas,
-                personasInscriptas,
-                effectivePrice
-              ),
-              reference: `${dbSchema.toUpperCase()}-EV-${eventoId}`,
-              paymentMethod: 'TRANSFER',
-              status: 'PENDING',
-              projectId: project.id,
-              categoryId: incomeCategoryId,
-              createdById: options?.createdById ?? null,
-              externalKey,
-              pairsCount: parejasInscriptas,
-              playersCount: personasInscriptas,
-            },
-          })
-          txByExternalKey.set(externalKey, linkedTx)
-          autoCreatedCount += 1
-        } catch (err) {
-          // Si otra ejecución paralela lo creó recién (P2002), lo leemos de la DB
-          if (
-            err instanceof Prisma.PrismaClientKnownRequestError &&
-            err.code === 'P2002'
-          ) {
-            linkedTx = await prisma.transaction.findUnique({ where: { externalKey } })
-            if (linkedTx) txByExternalKey.set(externalKey, linkedTx)
-          }
-        }
-      }
+      const linkedTx = txByExternalKey.get(externalKey) ?? null
 
       if (linkedTx) {
         const txAmt = Number(linkedTx.amount)
@@ -503,12 +459,12 @@ export async function getTournamentSyncDashboard(
 
 const updateConfigSchema = z.object({
   pricePerPlayer: z.number().positive('El monto por persona debe ser mayor a 0'),
-  autoSyncOnPlaying: z.boolean(),
+  autoSyncOnPlaying: z.boolean().optional().default(false),
 })
 
 export async function updateBillingConfigAction(input: {
   pricePerPlayer: number
-  autoSyncOnPlaying: boolean
+  autoSyncOnPlaying?: boolean
 }) {
   const session = await requireApiAuth()
   if (session.role === 'VIEWER') {
