@@ -1,0 +1,118 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "mysql"
+  url      = env("DATABASE_URL")
+}
+
+enum Role {
+  ADMIN
+  MANAGER
+  VIEWER
+}
+
+enum ProjectStatus {
+  ACTIVE
+  PAUSED
+  COMPLETED
+  CANCELLED
+}
+
+enum TransactionType {
+  INCOME
+  EXPENSE
+}
+
+enum PaymentMethod {
+  TRANSFER
+  CASH
+  CARD
+  CRYPTO
+  OTHER
+}
+
+enum TransactionStatus {
+  PAID
+  PENDING
+  CANCELLED
+}
+
+model User {
+  id           Int           @id @default(autoincrement())
+  name         String
+  email        String        @unique
+  passwordHash String
+  role         Role          @default(ADMIN)
+  transactions Transaction[]
+  createdAt    DateTime      @default(now())
+  updatedAt    DateTime      @updatedAt
+}
+
+model Project {
+  id                   Int           @id @default(autoincrement())
+  name                 String
+  clientName           String?
+  description          String?       @db.Text
+  status               ProjectStatus @default(ACTIVE)
+  budget               Decimal?      @db.Decimal(14, 2)
+  startDate            DateTime?
+  endDate              DateTime?
+  dbSchema             String?       @unique
+  customPricePerPlayer Decimal?      @db.Decimal(14, 2)
+  transactions         Transaction[]
+  createdAt            DateTime      @default(now())
+  updatedAt            DateTime      @updatedAt
+}
+
+model BillingConfig {
+  id                Int      @id @default(1)
+  pricePerPlayer    Decimal  @default(1300) @db.Decimal(14, 2)
+  autoSyncOnPlaying Boolean  @default(true)
+  updatedAt         DateTime @updatedAt
+}
+
+model Category {
+  id           Int             @id @default(autoincrement())
+  name         String          @unique
+  type         TransactionType
+  color        String          @default("#14b8a6")
+  isActive     Boolean         @default(true)
+  transactions Transaction[]
+  createdAt    DateTime        @default(now())
+  updatedAt    DateTime        @updatedAt
+}
+
+model Transaction {
+  id            Int               @id @default(autoincrement())
+  type          TransactionType
+  amount        Decimal           @db.Decimal(14, 2)
+  date          DateTime
+  description   String
+  reference     String?
+  paymentMethod PaymentMethod     @default(TRANSFER)
+  status        TransactionStatus @default(PAID)
+
+  // NULL = Movimiento Global de la empresa; NOT NULL = Movimiento imputado a un Proyecto
+  projectId     Int?
+  project       Project?          @relation(fields: [projectId], references: [id], onDelete: SetNull)
+
+  categoryId    Int
+  category      Category          @relation(fields: [categoryId], references: [id], onDelete: Restrict)
+
+  createdById   Int?
+  createdBy     User?             @relation(fields: [createdById], references: [id], onDelete: SetNull)
+
+  externalKey   String?           @unique
+  pairsCount    Int?
+  playersCount  Int?
+
+  createdAt     DateTime          @default(now())
+  updatedAt     DateTime          @updatedAt
+
+  @@index([date])
+  @@index([type, date])
+  @@index([projectId, type])
+  @@index([categoryId])
+}

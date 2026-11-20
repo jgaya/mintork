@@ -83,29 +83,12 @@ export function Footer() {
           <p className="text-sm text-muted-foreground">
             &copy; {new Date().getFullYear()} Mintork Soft. {t("footer", "allRights")}
           </p>
-          {/* <div className="flex items-center gap-6">
-            <Link
-              href="#"
-              className="text-sm text-muted-foreground transition-colors hover:text-foreground"
-              aria-label="Mintork Soft on LinkedIn"
-            >
-              LinkedIn
-            </Link>
-            <Link
-              href="#"
-              className="text-sm text-muted-foreground transition-colors hover:text-foreground"
-              aria-label="Mintork Soft on X"
-            >
-              X
-            </Link>
-            <Link
-              href="#"
-              className="text-sm text-muted-foreground transition-colors hover:text-foreground"
-              aria-label="Mintork Soft on GitHub"
-            >
-              GitHub
-            </Link>
-          </div> */}
+          <Link
+            href="/dashboard"
+            className="text-xs text-muted-foreground/70 transition-colors hover:text-primary"
+          >
+            Panel Administrativo
+          </Link>
         </div>
       </div>
     </footer>
